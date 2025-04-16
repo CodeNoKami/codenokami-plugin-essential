@@ -1,57 +1,56 @@
-#!/data/data/com.termux/files/usr/bin/bash
+// installer.sh (Termux) #!/data/data/com.termux/files/usr/bin/bash
 
-# === CodeNoKami Terminal Installer ===
+Title: CodeNoKami Terminal Installer
 
-echo "[*] Installing required packages..."
-pkg update -y
-pkg install -y nodejs git openssh curl
+Usage: bash installer.sh
 
-echo "[*] Creating plugin folder at ~/.codenokami_terminal..."
-mkdir -p ~/.codenokami_terminal
+echo "[+] Installing CodeNoKami Terminal Dependencies..."
 
-# === Terminal Script Setup ===
-echo "[*] Writing main terminal script..."
-cat << 'EOF' > ~/.codenokami_terminal.sh
-#!/data/data/com.termux/files/usr/bin/bash
+Ensure apt is up to date
 
-echo "----------------------------------------"
-echo "Welcome to CodeNoKami Terminal Session"
-echo "Date: $(date)"
-echo "----------------------------------------"
-echo ""
-echo "Running terminal session..."
+pkg update -y && pkg upgrade -y
 
-# Simple interactive loop
-while true; do
-    echo -n "codenokami> "
-    read -r cmd
-    if [[ "$cmd" == "exit" ]]; then
-        echo "Session closed."
-        break
-    fi
-    eval "$cmd"
-done
-EOF
+Install required packages
 
-chmod +x ~/.codenokami_terminal.sh
+pkg install -y nodejs
 
-# === Set up 'run-terminal' command ===
-echo "[*] Setting up 'run-terminal' command..."
+Create plugin directory if not exists
 
-if ! grep -q "alias run-terminal=" ~/.bashrc; then
-    echo 'alias run-terminal="bash ~/.codenokami_terminal.sh"' >> ~/.bashrc
-    echo "[+] Added run-terminal alias to ~/.bashrc"
-else
-    echo "[!] 'run-terminal' already exists in ~/.bashrc"
-fi
+mkdir -p ~/codenokami-terminal cd ~/codenokami-terminal
 
-# Reload bashrc
-echo "[*] Reloading bash configuration..."
-source ~/.bashrc
+Create simple Socket.io terminal server (run-terminal)
 
-# === Complete ===
-echo ""
-echo "========================================"
-echo "✅ CodeNoKami Terminal installed!"
-echo "➡ You can now run a terminal session with: run-terminal"
-echo "========================================"
+cat << 'EOF' > run-terminal.js const { Server } = require("socket.io"); const http = require("http"); const { spawn } = require("child_process");
+
+const server = http.createServer(); const io = new Server(server, { cors: { origin: "*" } });
+
+io.on("connection", (socket) => { console.log("[+] Client connected");
+
+socket.on("command", ({ sessionId, command }) => { const shell = spawn("sh", ["-c", command], { cwd: process.env.HOME });
+
+shell.stdout.on("data", (data) => {
+  socket.emit("output", { sessionId, output: data.toString(), prompt: false });
+});
+
+shell.stderr.on("data", (data) => {
+  socket.emit("output", { sessionId, output: data.toString(), prompt: false });
+});
+
+shell.on("close", () => {
+  socket.emit("output", { sessionId, output: `\n$ `, prompt: true });
+});
+
+}); });
+
+server.listen(5050, () => { console.log("[+] CodeNoKami Terminal running on port 5050"); }); EOF
+
+Make server executable
+
+chmod +x run-terminal.js
+
+Create shell wrapper
+
+cat << 'EOF' > run-terminal node ~/codenokami-terminal/run-terminal.js EOF chmod +x run-terminal mv run-terminal /data/data/com.termux/files/usr/bin/
+
+echo "[✓] Installation complete. Run with: run-terminal"
+
