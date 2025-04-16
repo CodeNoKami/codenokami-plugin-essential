@@ -1,56 +1,61 @@
-// installer.sh (Termux) #!/data/data/com.termux/files/usr/bin/bash
-
-Title: CodeNoKami Terminal Installer
-
-Usage: bash installer.sh
+#!/data/data/com.termux/files/usr/bin/bash
+# CodeNoKami Terminal Installer
 
 echo "[+] Installing CodeNoKami Terminal Dependencies..."
 
-Ensure apt is up to date
-
+# Ensure apt is up to date
 pkg update -y && pkg upgrade -y
 
-Install required packages
-
+# Install required packages
 pkg install -y nodejs
 
-Create plugin directory if not exists
+# Create plugin directory if not exists
+mkdir -p ~/codenokami-terminal
+cd ~/codenokami-terminal
 
-mkdir -p ~/codenokami-terminal cd ~/codenokami-terminal
+# Create simple Socket.io terminal server (run-terminal)
+cat << 'EOF' > run-terminal.js
+const { Server } = require("socket.io");
+const http = require("http");
+const { spawn } = require("child_process");
 
-Create simple Socket.io terminal server (run-terminal)
+const server = http.createServer();
+const io = new Server(server, { cors: { origin: "*" } });
 
-cat << 'EOF' > run-terminal.js const { Server } = require("socket.io"); const http = require("http"); const { spawn } = require("child_process");
+io.on("connection", (socket) => {
+  console.log("[+] Client connected");
 
-const server = http.createServer(); const io = new Server(server, { cors: { origin: "*" } });
+  socket.on("command", ({ sessionId, command }) => {
+    const shell = spawn("sh", ["-c", command], { cwd: process.env.HOME });
 
-io.on("connection", (socket) => { console.log("[+] Client connected");
+    shell.stdout.on("data", (data) => {
+      socket.emit("output", { sessionId, output: data.toString(), prompt: false });
+    });
 
-socket.on("command", ({ sessionId, command }) => { const shell = spawn("sh", ["-c", command], { cwd: process.env.HOME });
+    shell.stderr.on("data", (data) => {
+      socket.emit("output", { sessionId, output: data.toString(), prompt: false });
+    });
 
-shell.stdout.on("data", (data) => {
-  socket.emit("output", { sessionId, output: data.toString(), prompt: false });
+    shell.on("close", () => {
+      socket.emit("output", { sessionId, output: `\n$ `, prompt: true });
+    });
+  });
 });
 
-shell.stderr.on("data", (data) => {
-  socket.emit("output", { sessionId, output: data.toString(), prompt: false });
+server.listen(5050, () => {
+  console.log("[+] CodeNoKami Terminal running on port 5050");
 });
+EOF
 
-shell.on("close", () => {
-  socket.emit("output", { sessionId, output: `\n$ `, prompt: true });
-});
-
-}); });
-
-server.listen(5050, () => { console.log("[+] CodeNoKami Terminal running on port 5050"); }); EOF
-
-Make server executable
-
+# Make server executable
 chmod +x run-terminal.js
 
-Create shell wrapper
+# Create shell wrapper
+cat << 'EOF' > run-terminal
+node ~/codenokami-terminal/run-terminal.js
+EOF
 
-cat << 'EOF' > run-terminal node ~/codenokami-terminal/run-terminal.js EOF chmod +x run-terminal mv run-terminal /data/data/com.termux/files/usr/bin/
+chmod +x run-terminal
+mv run-terminal /data/data/com.termux/files/usr/bin/
 
 echo "[✓] Installation complete. Run with: run-terminal"
-
