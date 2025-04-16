@@ -1,19 +1,18 @@
 #!/data/data/com.termux/files/usr/bin/bash
-# CodeNoKami Terminal Installer
+
+# Title: CodeNoKami Terminal Installer
+# Usage: bash installer.sh
 
 echo "[+] Installing CodeNoKami Terminal Dependencies..."
-
-# Ensure apt is up to date
-pkg update -y && pkg upgrade -y
 
 # Install required packages
 pkg install -y nodejs
 
-# Create plugin directory if not exists
+# Create plugin directory
 mkdir -p ~/codenokami-terminal
 cd ~/codenokami-terminal
 
-# Create simple Socket.io terminal server (run-terminal)
+# Create run-terminal.js script
 cat << 'EOF' > run-terminal.js
 const { Server } = require("socket.io");
 const http = require("http");
@@ -47,10 +46,13 @@ server.listen(5050, () => {
 });
 EOF
 
-# Make server executable
+# Make server script executable
 chmod +x run-terminal.js
 
-# Create shell wrapper
+# Install required Node.js modules
+npm install socket.io
+
+# Create shell wrapper for Termux command
 cat << 'EOF' > run-terminal
 node ~/codenokami-terminal/run-terminal.js
 EOF
